@@ -13,8 +13,10 @@ It answers one question for each asset path in the game `Data` folder:
 
 ## Usage
 
-Run the tool outside MO2. It reads the game `Data` folder, each enabled mod, and `Overwrite` directly.
-The tool stops if MO2 USVFS is active. USVFS combines these locations into one virtual `Data` folder and hides the origin of each file.
+Run the tool outside MO2.
+It reads the game `Data` folder, each enabled mod, and `Overwrite` directly.
+The tool stops if MO2 USVFS is active.
+USVFS combines these locations into one virtual `Data` folder and hides the origin of each file.
 
 Query one asset path:
 
@@ -38,7 +40,8 @@ skyrim-asset-chain.exe `
 
 Batch input contains one path per line.
 
-The tool normalizes case and separators. For example, these inputs identify the same asset:
+The tool normalizes case and separators.
+For example, these inputs identify the same asset:
 
 ```text
 scripts/QF_MQ101_0003372B.pex
@@ -46,11 +49,13 @@ Scripts\qf_mq101_0003372b.PEX
 /scripts/QF_MQ101_0003372B.pex
 ```
 
-`--game` accepts `SkyrimSE` or `SkyrimVR`. `SkyrimSE` covers Special Edition and Anniversary Edition.
+`--game` accepts `SkyrimSE` or `SkyrimVR`.
+`SkyrimSE` covers Special Edition and Anniversary Edition.
 
 ## Output
 
-The tool writes compact JSONL. Each row identifies one loose file or BSA member that matches the requested path:
+The tool writes compact JSONL.
+Each row identifies one loose file or BSA member that matches the requested path:
 
 ```jsonl
 {"assetPath":"scripts/qf_mq101_0003372b.pex","providerIndex":0,"sourceKind":"archive","sourceOrigin":"Game Data","sourcePath":"C:/Game/Data/Skyrim - Misc.bsa","sourceAssetPath":"scripts/qf_mq101_0003372b.pex","archive":"Skyrim - Misc.bsa","archiveLoadMechanism":"ini-list","archiveLoadSource":"sResourceArchiveList","archiveLoadIndex":0,"associatedPlugin":null,"pluginLoadOrderIndex":null,"modlistIndex":null,"winner":false}
@@ -62,24 +67,29 @@ The tool writes compact JSONL. Each row identifies one loose file or BSA member 
 - `plugin-association`: An active plugin caused the engine to register its associated archive.
 - `engine-default`: The engine registered a default archive without an INI-list entry or plugin association.
 
-`archiveLoadSource` identifies the exact INI setting, plugin, or game. `archiveLoadIndex` gives the final archive position.
+`archiveLoadSource` identifies the exact INI setting, plugin, or game.
+`archiveLoadIndex` gives the final archive position.
 
-Archive rows come first in archive-load order. Loose rows follow in MO2 priority order.
+Archive rows come first in archive-load order.
+Loose rows follow in MO2 priority order.
 
 When the profile contains several copies of a registered BSA, the tool reports matching assets from every copy.
 Only the copy that the game uses can have `winner:true`.
-A successful query can report matches without a winner. This occurs when only overridden BSA files contain the asset.
+A successful query can report matches without a winner.
+This occurs when only overridden BSA files contain the asset.
 
 A requested path with no matching loose file or BSA member produces no row.
 A request with no matches succeeds with empty standard output.
 
-Diagnostics use standard error. An error returns a nonzero exit code and produces no JSONL output.
+Diagnostics use standard error.
+An error returns a nonzero exit code and produces no JSONL output.
 
 ## Resolution rules
 
 The tool applies these rules:
 
-1. MO2 skip rules exclude matching files and directories from enabled mods and `Overwrite`. They do not apply to the game's `Data` folder.
+1. MO2 skip rules exclude matching files and directories from enabled mods and `Overwrite`.
+   They do not apply to the game's `Data` folder.
 2. When several BSA files have the same name, MO2 priority selects one file.
 3. When several registered BSAs contain the asset, the game archive order selects the winning BSA.
 4. Loose files override BSA members.
@@ -90,7 +100,8 @@ If a setting is absent, the tool uses the MO2 default: `.mohidden` for suffixes 
 If a setting is present but empty, the tool skips nothing for that setting instead of using the MO2 default.
 A skipped file does not hide an unsuffixed sibling.
 
-For Skyrim SE, the engine derives two associated BSA names from each active plugin. For `Example.esp`, these names are:
+For Skyrim SE, the engine derives two associated BSA names from each active plugin.
+For `Example.esp`, these names are:
 
 ```text
 Example.bsa
@@ -105,7 +116,8 @@ If the VR list loads no archive, the engine registers `Skyrim_VR - Main.bsa` by 
 
 ## Root Builder
 
-The tool supports the conventional Root Builder layout. It applies these mappings to each enabled mod and `Overwrite`:
+The tool supports the conventional Root Builder layout.
+It applies these mappings to each enabled mod and `Overwrite`:
 
 - The mod directory uses the normal MO2 `Data` mapping.
 - The contents of its `Root` directory map to the game directory.
@@ -116,7 +128,8 @@ Custom Root Builder file patterns and exclusions are not supported.
 
 ## Limits
 
-The tool does not model the runtime precedence of these known cases. It rejects them instead of inferring a winner:
+The tool does not model the runtime precedence of these known cases.
+It rejects them instead of inferring a winner:
 
 - At one path in `Data`, `Overwrite` or a higher-priority mod contains a directory, but a lower-priority mod or the game contains a file.
 - An active plugin's matching sidecar INI contains a nonempty archive-list setting, such as `sResourceArchiveList`.
@@ -128,7 +141,8 @@ The tool does not support custom mappings from other MO2 plugins that use `IPlug
 
 ## Development
 
-Source builds use [mise](https://mise.jdx.dev/). Mise installs the .NET 10 SDK.
+Source builds use [mise](https://mise.jdx.dev/).
+Mise installs the .NET 10 SDK.
 
 ### Build
 

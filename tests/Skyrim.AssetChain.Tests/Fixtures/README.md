@@ -1,8 +1,10 @@
 # BSA fixtures
 
-BSArch v0.9c created the runtime-compatible archives with `-sse`. The files with `compressed` in the name also use `-z`.
+BSArch v0.9c created the runtime-compatible archives with `-sse`.
+The files with `compressed` in the name also use `-z`.
 
-`archive-skyrim-le.bsa` uses `-tes5`. It is an intentional incompatible-format fixture.
+`archive-skyrim-le.bsa` uses `-tes5`.
+It is an intentional incompatible-format fixture.
 
 Verified with `BSArch64.exe <archive> -list`:
 
