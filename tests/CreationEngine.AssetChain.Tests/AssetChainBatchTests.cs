@@ -1,0 +1,163 @@
+using Xunit;
+using static CreationEngine.AssetChain.Tests.AssetChainTestDriver;
+
+namespace CreationEngine.AssetChain.Tests;
+
+public sealed class AssetChainBatchTests(AssetChainFixture fixture) : IClassFixture<AssetChainFixture>
+{
+    private readonly AssetChainTestDriver _driver = new(fixture);
+
+    [Fact]
+    public void OnePathBatchMatchesSingularOutput()
+    {
+        Assert.Equal(
+            _driver.Run("scripts/shared.pex"),
+            _driver.RunBatch("scripts/shared.pex\n"));
+    }
+
+    [Fact]
+    public void PreservesInputOrderAndContiguousChains()
+    {
+        var result = _driver.RunBatch(
+            "scripts/blocked.pex\nscripts/looseonly.pex\nscripts/splitorder.pex\n");
+        var rows = ParseRows(result);
+
+        Assert.Equal(
+        [
+            "scripts/blocked.pex",
+            "scripts/looseonly.pex",
+            "scripts/looseonly.pex",
+            "scripts/looseonly.pex",
+            "scripts/splitorder.pex",
+            "scripts/splitorder.pex"
+        ],
+            rows.Select(row => row.GetProperty("assetPath").GetString()));
+        Assert.Equal(new[] { 0, 0, 1, 2, 0, 1 },
+            rows.Select(row => row.GetProperty("providerIndex").GetInt32()));
+    }
+
+    [Fact]
+    public void FileAndStandardInputProduceIdenticalOutput()
+    {
+        var input = "scripts/blocked.pex\nscripts/overwriteonly.pex\n";
+        var inputPath = Path.Combine(fixture.Root, "asset-paths.txt");
+        File.WriteAllText(inputPath, input);
+
+        Assert.Equal(
+            _driver.RunBatch(input),
+            _driver.RunBatch(string.Empty, inputPath));
+    }
+
+    [Fact]
+    public void RejectsCanonicalDuplicateWithoutOutput()
+    {
+        var result = _driver.RunBatch("Scripts\\Shared.pex\n/scripts/shared.PEX\n");
+
+        Assert.NotEqual(0, result.ExitCode);
+        Assert.Equal(string.Empty, result.Stdout);
+        Assert.Contains("duplicate asset path", result.Stderr, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("line 2", result.Stderr, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void RejectsEmptyInputAndEmptyLines()
+    {
+        var empty = _driver.RunBatch(string.Empty);
+        Assert.NotEqual(0, empty.ExitCode);
+        Assert.Equal(string.Empty, empty.Stdout);
+        Assert.Contains("empty", empty.Stderr, StringComparison.OrdinalIgnoreCase);
+
+        var emptyLine = _driver.RunBatch("scripts/shared.pex\n\n");
+        Assert.NotEqual(0, emptyLine.ExitCode);
+        Assert.Equal(string.Empty, emptyLine.Stdout);
+        Assert.Contains("line 2", emptyLine.Stderr, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void EmptyChainProducesNoRowsInBatch()
+    {
+        var result = _driver.RunBatch(
+            "scripts/blocked.pex\nscripts/missing.pex\nscripts/overwriteonly.pex\n");
+        var rows = ParseRows(result);
+
+        Assert.Equal(string.Empty, result.Stderr);
+        Assert.Equal(
+            ["scripts/blocked.pex", "scripts/overwriteonly.pex"],
+            rows.Select(row => row.GetProperty("assetPath").GetString()));
+        Assert.Equal([0, 0],
+            rows.Select(row => row.GetProperty("providerIndex").GetInt32()));
+    }
+
+    [Fact]
+    public void BatchOutputIsAtomicOnOperationalError()
+    {
+        var root = fixture.CreateCopy();
+        try
+        {
+            var relativePath = Path.Combine("Scripts", "LooseOnly.pex");
+            Directory.CreateDirectory(Path.Combine(root, "managed-mods", "Middle", relativePath));
+            File.Delete(Path.Combine(root, "managed-mods", "High", relativePath));
+
+            var result = _driver.RunBatch(
+                "scripts/overwriteonly.pex\nscripts/looseonly.pex\n",
+                root: root);
+
+            Assert.NotEqual(0, result.ExitCode);
+            Assert.Equal(string.Empty, result.Stdout);
+            Assert.Contains("file/directory collision", result.Stderr, StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void ValidatesProfileBeforeReadingStandardInput()
+    {
+        var root = fixture.CreateCopy();
+        try
+        {
+            File.Delete(Path.Combine(root, "managed-mods", "High", "Omega.esp"));
+            using var stdin = new UnreadableInput();
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+            var exitCode = Program.Run(
+            [
+                "--game", "SkyrimSE", "--mo2-root", root,
+                "--profile", fixture.ProfileName, "--paths-from", "-"
+            ], stdin, stdout, stderr, Path.Combine(root, "Documents"));
+
+            Assert.Equal(1, exitCode);
+            Assert.Empty(stdout.ToString());
+            Assert.Contains("Omega.esp", stderr.ToString());
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void RejectsPositionalAndBatchInputsTogether()
+    {
+        var result = Invoke(
+        [
+            "--game", "SkyrimSE",
+            "--mo2-root", fixture.Root,
+            "--profile", fixture.ProfileName,
+            "--paths-from", "-",
+            "scripts/shared.pex"
+        ],
+            "scripts/blocked.pex\n");
+
+        Assert.NotEqual(0, result.ExitCode);
+        Assert.Equal(string.Empty, result.Stdout);
+        Assert.Contains("exactly one", result.Stderr, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private sealed class UnreadableInput : TextReader
+    {
+        public override string? ReadLine() => throw new InvalidOperationException("Standard input was read.");
+    }
+}
