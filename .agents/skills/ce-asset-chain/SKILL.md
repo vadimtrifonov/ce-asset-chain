@@ -12,7 +12,6 @@ Requires Windows.
 
 ```powershell
 mise trust mise.toml
-mise install
 ```
 
 ## Query
